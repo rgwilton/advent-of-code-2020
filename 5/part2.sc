@@ -5,6 +5,7 @@
 val input = scala.io.Source.fromFile("input.txt").getLines
 
 def code2BinStr(c: String) = c.map { case 'B' | 'R' => '1'; case _ => '0' }
+def lineToInt(line: String) = Integer.parseInt(code2BinStr(line), 2)
 
 def seatPairToGap(pair: Seq[Int]) =
   pair match {
@@ -16,8 +17,7 @@ def seatPairToGap(pair: Seq[Int]) =
 // take consecutive pairs and find the pair with a gap and return the missing number.
 val answer = 
   input
-  .map(code2BinStr)
-  .map(Integer.parseInt(_, 2))
+  .map(lineToInt)
   .toSeq
   .sorted
   .sliding(2)

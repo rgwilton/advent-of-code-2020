@@ -1,2 +1,5 @@
 *.class
 *.log
+.ammonite
+.metals
+.vscode
