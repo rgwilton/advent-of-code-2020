@@ -1,7 +1,7 @@
 #!amm
 // scala 2.13.2
 
-// Parse the input into a strings.
+// Parse the input into an iterator over input lines.
 val input = scala.io.Source.fromFile("input.txt").getLines
 
 def code2BinStr(c: String) = c.map { case 'B' | 'R' => '1'; case _ => '0' }
