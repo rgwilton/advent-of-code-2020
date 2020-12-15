@@ -33,48 +33,42 @@ object Parser {
 }
 
 val instructions = input.map(Parser.parseLine).toSeq
-
 val parseEndTime = System.currentTimeMillis()
 
-// Addresses are correct, fix values.
-val answerPart1 = {
+type WriteMemFn = (mutable.Map[Long, Long], Mask, Long, Long) => Unit
+def processInstructions(instructions: Seq[Instruction])(writeMem: WriteMemFn) = {
   val memory = mutable.Map[Long, Long]()
   var curMask = Mask("0")
 
   for {instr <- instructions} {
         instr match {
           case m:Mask => curMask = m
-          case Mem(addr, value) => memory(addr) = (value & curMask.xBits) | curMask.oneBits
+          case Mem(addr, value) => writeMem(memory, curMask, addr, value)
         }
       }
   memory.values.sum
 }
+val processMemInstructions = processInstructions(instructions) _
+
+// Addresses are correct, fix values.
+val answerPart1 = processMemInstructions{ (memory, mask, addr, value) =>
+  memory(addr) = (value & mask.xBits) | mask.oneBits
+}
 val part1EndTime = System.currentTimeMillis()
 
 // Values are correct, fix addresses.
-val answerPart2 = {
-  val memory = mutable.Map[Long, Long]()
-  var curMask = Mask("0")
-
-  def write(addr: Long, value: Long, floatingBits: List[Int]): Unit = {
+val answerPart2 = processMemInstructions{ (memory, mask, addr, value) =>
+  def write(addr: Long, floatingBits: List[Int]): Unit = {
     floatingBits match {
       case Nil => memory(addr) = value
       case x::xs => 
-        write(addr, value, xs)
-        write(addr | (1L << x), value, xs)
+        write(addr, xs)
+        write(addr | (1L << x), xs)
     }
   }
 
-  for {instr <- instructions} {
-        instr match {
-          case m:Mask => curMask = m
-          case Mem(addr, value) =>
-            val maskedAddr =  (addr & ~curMask.xBits) | curMask.oneBits
-            write(maskedAddr, value, curMask.floatingBits)
-        }
-      }
-
-  memory.values.sum
+  val maskedAddr =  (addr & ~mask.xBits) | mask.oneBits
+  write(maskedAddr, mask.floatingBits)
 }
 val part2EndTime = System.currentTimeMillis()
     
