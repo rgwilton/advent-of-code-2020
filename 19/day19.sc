@@ -7,20 +7,20 @@ import fastparse._, NoWhitespace._
 val startTime = System.currentTimeMillis()
 
 // Parse the input
-def input = scala.io.Source.fromFile("small_input_part2.txt").getLines.mkString("", "\n", "\n")
+def input = scala.io.Source.fromFile("input.txt").getLines.mkString("", "\n", "\n")
 
 trait Rule
 case class Literal(c: Char) extends Rule
 case class SeqRule(rules: Seq[Int]) extends Rule
-case class AltRule(first: Rule, alternative: Rule) extends Rule
+case class AltRule(alternatives: Seq[Rule]) extends Rule
 
 object Parser {
   // Treat operators as having the same precedence.
   def number[_: P] = P( CharsWhileIn("0-9").!.map(_.toInt) )
   def seqNumbers[_ :P] = P(number.rep(sep=" ")).map(SeqRule)
-  def literal[_: P] = P("\"" ~/ AnyChar.! ~/ "\"").map(ch =>Literal(ch(0)))
+  def literal[_: P] = P("\"" ~/ AnyChar.! ~/ "\"").map(ch => Literal(ch(0)))
   def alternation[_:P] = P(seqNumbers ~ " | " ~/ seqNumbers).map {
-    case (firstMatch, secondMatch) => AltRule(firstMatch, secondMatch)
+    case (firstMatch, secondMatch) => AltRule(Seq(firstMatch, secondMatch))
   }
   def ruleLine[_: P] = P(number ~ ": " ~/ (literal | alternation | seqNumbers) ~ "\n").map {
     case (index, rule) => index -> rule
@@ -31,39 +31,36 @@ object Parser {
   def file[_: P] = P( rules ~ "\n" ~ testLines ~ End )
 
   def parseLine(input: String) =
-    parse(input, file(_)) match { case Parsed.Success(output, _) => output }
+    parse(input, file(_)) match {
+      case Parsed.Success(output, _) => output
+    }
 }
 
 var (rules, testLines) = Parser.parseLine(input)
 
 // Evaluate the expression as it is parsed.
-def check(r: Rule, input: List[Char]): (Boolean, List[Char]) = {
-  if (input.isEmpty) (false, input)
+// Returns the lists of possible remaining characters after the rule has been processed.
+def check(r: Rule, input: List[Char]): Seq[List[Char]] = {
+  if (input.isEmpty) Seq()
   else
     r match {
       case Literal(c) => 
-        if (c == input.head) (true, input.tail)
-        else (false, input) 
-      case AltRule(first, second) =>
-        check(first, input) match {
-          case x@(true, remaining) => x
-          case _ => check(second, input)
-        }
+        if (c == input.head) Seq(input.tail) else Seq()
+
+      case AltRule(alternatives) =>
+        alternatives.flatMap(r => check(r, input))
+      
       case SeqRule(rs) => 
-        var (ok, remaining) = (true, input)
-        val iter = rs.iterator
-        while (ok && iter.hasNext) {
-          val res = check(rules(iter.next), remaining)
-          ok = res._1; remaining = res._2
+        rs.foldLeft(Seq(input)) {
+          case (Seq(), ruleIndex) => Seq()
+          case (xs, ruleIndex) => 
+            xs.flatMap(check(rules(ruleIndex), _))
         }
-        if (iter.hasNext) ok = false
-        (ok, remaining)
     }
 }
 
 def checkLine(line: String) = {
-  val (ok, remaining) = check(rules(0), line.toList)
-  if (ok && remaining.isEmpty) true else false
+  check(rules(0), line.toList).exists(_.isEmpty)
 }
 
 val answerPart1 = {
@@ -75,12 +72,8 @@ val answerPart2 = {
   // Update rules:
   // 8: 42 | 42 8
   // 11: 42 31 | 42 11 31
-  rules += (8 -> AltRule(SeqRule(Seq(42)), SeqRule(Seq(42, 8))))
-  rules += (11 -> AltRule(SeqRule(Seq(42, 31)), SeqRule(Seq(42, 11, 31))))
-
-  println(checkLine("babbbbaabbbbbabbbbbbaabaaabaaa"))
-
-  testLines.filter(checkLine).foreach(println)
+  rules += (8 -> AltRule(Seq(SeqRule(Seq(42)), SeqRule(Seq(42, 8)))))
+  rules += (11 -> AltRule(Seq(SeqRule(Seq(42, 31)), SeqRule(Seq(42, 11, 31)))))
 
   testLines.count(checkLine)
 }
